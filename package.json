@@ -1,0 +1,13 @@
+{
+  "name": "humans-in-the-loop",
+  "version": "1.0.0",
+  "description": "Humans In The Loop - There is no AI. Only humans in the loop.",
+  "engines": { "node": ">=18" },
+  "main": "server.js",
+  "scripts": {
+    "start": "node server.js"
+  },
+  "dependencies": {
+    "ws": "^8.16.0"
+  }
+}

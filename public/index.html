@@ -1,0 +1,1033 @@
+﻿<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Humans In The Loop</title>
+<style>
+  * { margin:0; padding:0; box-sizing:border-box; }
+  body {
+    font-family: 'Segoe UI', system-ui, -apple-system, sans-serif;
+    background: #0d0d0d;
+    color: #e0e0e0;
+    min-height: 100vh;
+    overflow-x: hidden;
+  }
+
+  .bg-grid {
+    position: fixed; inset: 0; pointer-events: none;
+    background-image:
+      linear-gradient(rgba(255,255,255,0.03) 1px, transparent 1px),
+      linear-gradient(90deg, rgba(255,255,255,0.03) 1px, transparent 1px);
+    background-size: 40px 40px; z-index: 0;
+  }
+
+  .header { text-align: center; padding: 32px 16px 16px; position: relative; z-index: 1; }
+  .header h1 {
+    font-size: 2.2rem; font-weight: 900;
+    background: linear-gradient(135deg, #a78bfa, #f472b6, #fb923c);
+    -webkit-background-clip: text; -webkit-text-fill-color: transparent; background-clip: text;
+  }
+  .header .subtitle { color: #666; font-size: 0.9rem; margin-top: 4px; font-style: italic; }
+  .header .tagline { color: #555; font-size: 0.8rem; margin-top: 4px; }
+
+  .main { max-width: 720px; margin: 0 auto; padding: 0 16px 40px; position: relative; z-index: 1; }
+
+  .stats { display: flex; gap: 12px; justify-content: center; margin-bottom: 20px; flex-wrap: wrap; }
+  .stat {
+    background: rgba(255,255,255,0.05); border: 1px solid rgba(255,255,255,0.08);
+    border-radius: 12px; padding: 10px 18px; font-size: 0.8rem; color: #888;
+  }
+  .stat span { color: #a78bfa; font-weight: 700; font-size: 1.1rem; }
+  .credits-badge {
+    display: inline-flex; align-items: center; gap: 6px;
+    background: rgba(167,139,250,0.15); border: 1px solid rgba(167,139,250,0.3);
+    border-radius: 20px; padding: 6px 14px; font-size: 0.85rem; font-weight: 600; color: #a78bfa;
+  }
+  .credits-badge.zero { color: #f87171; border-color: rgba(248,113,113,0.3); background: rgba(248,113,113,0.1); }
+
+  .tabs {
+    display: flex; gap: 0; background: rgba(255,255,255,0.03);
+    border-radius: 14px; padding: 4px; margin-bottom: 20px; border: 1px solid rgba(255,255,255,0.06);
+  }
+  .tab {
+    flex: 1; padding: 12px; text-align: center; border-radius: 10px;
+    cursor: pointer; font-size: 0.9rem; font-weight: 600; transition: all 0.2s; color: #666;
+  }
+  .tab.active { background: rgba(167,139,250,0.2); color: #a78bfa; }
+  .tab:hover:not(.active) { color: #999; background: rgba(255,255,255,0.03); }
+
+  .card {
+    background: rgba(255,255,255,0.03); border: 1px solid rgba(255,255,255,0.06);
+    border-radius: 16px; padding: 24px; margin-bottom: 16px;
+  }
+
+  .ask-section { display: none; }
+  .ask-section.active { display: block; }
+  .ask-section textarea {
+    width: 100%; background: rgba(255,255,255,0.05); border: 1px solid rgba(255,255,255,0.1);
+    border-radius: 12px; padding: 14px; color: #e0e0e0; font-size: 0.95rem;
+    resize: none; height: 80px; font-family: inherit;
+  }
+  .ask-section textarea:focus { outline: none; border-color: rgba(167,139,250,0.5); }
+  .ask-section textarea::placeholder { color: #555; }
+
+  .btn {
+    padding: 12px 24px; border-radius: 10px; border: none;
+    font-size: 0.9rem; font-weight: 700; cursor: pointer; transition: all 0.2s; font-family: inherit;
+  }
+  .btn-primary {
+    background: linear-gradient(135deg, #a78bfa, #818cf8); color: #fff; width: 100%; margin-top: 12px;
+  }
+  .btn-primary:hover { opacity: 0.9; transform: translateY(-1px); }
+  .btn-primary:disabled { opacity: 0.3; cursor: not-allowed; transform: none; }
+
+  .draw-toggle-row { display: flex; gap: 8px; margin-bottom: 8px; align-items: center; }
+  .draw-toggle {
+    display: flex; align-items: center; gap: 6px; cursor: pointer;
+    padding: 6px 12px; border-radius: 8px; background: rgba(255,255,255,0.04);
+    color: #666; font-size: 0.82rem; font-weight: 600; transition: all 0.2s;
+  }
+  .draw-toggle.active {
+    background: rgba(244,114,182,0.15); color: #f472b6; border: 1px solid rgba(244,114,182,0.2);
+  }
+  .draw-toggle:hover { background: rgba(255,255,255,0.06); }
+
+  .larp-section { display: none; }
+  .larp-section.active { display: block; }
+
+  .larp-idle { text-align: center; padding: 20px 0; }
+  .larp-idle h3 { font-size: 1.3rem; color: #c4b5fd; margin-bottom: 8px; }
+  .larp-idle p { color: #666; font-size: 0.85rem; margin-bottom: 20px; }
+
+  .task-card { display: none; }
+  .task-card.active { display: block; }
+
+  .task-question {
+    background: rgba(167,139,250,0.08); border: 1px solid rgba(167,139,250,0.2);
+    border-radius: 12px; padding: 16px; margin-bottom: 16px; font-size: 0.95rem; line-height: 1.5;
+  }
+  .task-question .label {
+    color: #a78bfa; font-size: 0.75rem; font-weight: 700; text-transform: uppercase;
+    letter-spacing: 1px; margin-bottom: 8px; display: flex; align-items: center; gap: 6px;
+  }
+  .task-question .draw-badge {
+    display: inline-flex; align-items: center; gap: 4px;
+    background: rgba(244,114,182,0.15); border: 1px solid rgba(244,114,182,0.2);
+    border-radius: 6px; padding: 3px 8px; font-size: 0.7rem; color: #f472b6; margin-bottom: 6px;
+  }
+
+  .timer-section { display: flex; align-items: center; gap: 10px; margin-bottom: 12px; }
+  .timer-bar-outer { flex: 1; height: 6px; background: rgba(255,255,255,0.05); border-radius: 3px; overflow: hidden; }
+  .timer-bar-inner {
+    height: 100%; border-radius: 3px; background: linear-gradient(90deg, #a78bfa, #f472b6);
+    transition: width 0.3s linear;
+  }
+  .timer-bar-inner.urgent { background: linear-gradient(90deg, #f87171, #fb923c); }
+  .timer-text { font-size: 0.85rem; font-weight: 700; min-width: 36px; color: #a78bfa; }
+  .timer-text.urgent { color: #f87171; animation: pulse 0.5s infinite; }
+  @keyframes pulse { 50% { opacity: 0.5; } }
+
+  .sam-warning { color: #666; font-size: 0.75rem; font-style: italic; text-align: center; margin-bottom: 12px; }
+
+  .larp-section textarea {
+    width: 100%; background: rgba(255,255,255,0.05); border: 1px solid rgba(255,255,255,0.1);
+    border-radius: 12px; padding: 14px; color: #e0e0e0; font-size: 0.9rem;
+    resize: none; height: 120px; font-family: inherit;
+  }
+  .larp-section textarea:focus { outline: none; border-color: rgba(167,139,250,0.5); }
+
+  .btn-row { display: flex; gap: 8px; margin-top: 12px; }
+  .btn-danger {
+    background: rgba(248,113,113,0.15); color: #f87171; border: 1px solid rgba(248,113,113,0.2);
+  }
+  .btn-danger:hover { background: rgba(248,113,113,0.25); }
+
+  /* Canvas */
+  .canvas-wrapper {
+    background: rgba(255,255,255,0.02); border: 1px solid rgba(255,255,255,0.08);
+    border-radius: 12px; margin-bottom: 12px; overflow: hidden; display: none;
+  }
+  .canvas-wrapper.active { display: block; }
+  .canvas-toolbar {
+    display: flex; gap: 6px; padding: 8px 12px;
+    border-bottom: 1px solid rgba(255,255,255,0.06); align-items: center; flex-wrap: wrap;
+  }
+  .canvas-toolbar .color-btn { width: 22px; height: 22px; border-radius: 50%; border: 2px solid transparent; cursor: pointer; }
+  .canvas-toolbar .color-btn.active { border-color: #fff; }
+  .canvas-toolbar .size-btn {
+    background: rgba(255,255,255,0.06); color: #888; border: 1px solid rgba(255,255,255,0.1);
+    border-radius: 4px; padding: 2px 10px; cursor: pointer; font-size: 0.75rem;
+  }
+  .canvas-toolbar .size-btn.active { background: rgba(167,139,250,0.2); color: #a78bfa; border-color: rgba(167,139,250,0.3); }
+  .canvas-toolbar .tool-btn {
+    background: rgba(255,255,255,0.04); color: #888; border: 1px solid rgba(255,255,255,0.08);
+    border-radius: 4px; padding: 2px 10px; cursor: pointer; font-size: 0.75rem;
+  }
+  .canvas-toolbar .tool-btn.active { background: rgba(167,139,250,0.2); color: #a78bfa; }
+  canvas#drawCanvas { display: block; width: 100%; height: 320px; background: #fff; cursor: crosshair; touch-action: none; }
+
+  /* Conversation */
+  .conversation-box {
+    background: rgba(255,255,255,0.02); border: 1px solid rgba(255,255,255,0.06);
+    border-radius: 16px; margin-bottom: 16px; min-height: 320px; max-height: 460px;
+    overflow: hidden; display: flex; flex-direction: column;
+  }
+  .conversation-scroll {
+    flex: 1; overflow-y: auto; padding: 20px;
+    display: flex; flex-direction: column; justify-content: center;
+  }
+  .conversation-scroll.has-messages { justify-content: flex-start; }
+  .conversation-empty { text-align: center; }
+  .conv-image-wrapper { width: 100px; height: 100px; margin: 0 auto 16px; }
+  .conv-image { width: 100%; height: 100%; }
+
+  /* Logo bar at top of conversation when messages exist */
+  .conv-logo-bar {
+    display: none; align-items: center; gap: 8px;
+    padding: 10px 16px; border-bottom: 1px solid rgba(255,255,255,0.05);
+  }
+  .conv-logo-bar.visible { display: flex; }
+  .conv-logo-icon { width: 28px; height: 28px; flex-shrink: 0; }
+  .conv-logo-bar .brand-text {
+    font-size: 0.82rem; font-weight: 700; color: #888;
+    letter-spacing: 0.5px;
+  }
+
+  /* Screenshot shadow card */
+  .screenshot-card {
+    background: rgba(255,255,255,0.04); border: 1px solid rgba(255,255,255,0.08);
+    border-radius: 16px; overflow: hidden;
+    box-shadow: 0 8px 40px rgba(0,0,0,0.5), 0 2px 8px rgba(0,0,0,0.3);
+  }
+  .screenshot-header {
+    display: flex; align-items: center; gap: 8px;
+    padding: 12px 16px; border-bottom: 1px solid rgba(255,255,255,0.06);
+  }
+  .screenshot-header .logo-icon { width: 24px; height: 24px; flex-shrink: 0; }
+  .screenshot-header .brand {
+    font-size: 0.8rem; font-weight: 700; color: #999;
+    letter-spacing: 0.5px;
+  }
+  .conv-empty-title { color: #888; font-size: 1rem; font-weight: 600; margin-bottom: 6px; }
+  .conv-empty-sub { color: #555; font-size: 0.8rem; font-style: italic; }
+
+  .conv-msg { margin-bottom: 14px; animation: fadeIn 0.3s ease; }
+  .conv-msg-q { display: flex; justify-content: flex-end; margin-bottom: 8px; }
+  .conv-msg-q .bubble {
+    background: rgba(167,139,250,0.15); border: 1px solid rgba(167,139,250,0.2);
+    border-radius: 14px 14px 4px 14px; padding: 10px 14px; max-width: 80%;
+    font-size: 0.88rem; color: #c4b5fd; line-height: 1.4;
+  }
+  .conv-msg-a { display: flex; gap: 8px; align-items: flex-start; flex-direction: column; }
+  .conv-msg-a .msg-row { display: flex; gap: 8px; align-items: flex-start; }
+  .conv-msg-a .avatar {
+    width: 28px; height: 28px; border-radius: 50%; background: rgba(167,139,250,0.2);
+    display: flex; align-items: center; justify-content: center; font-size: 0.7rem; flex-shrink: 0;
+  }
+  .conv-msg-a .bubble {
+    background: rgba(255,255,255,0.04); border: 1px solid rgba(255,255,255,0.06);
+    border-radius: 14px 14px 14px 4px; padding: 10px 14px; max-width: 80%;
+    font-size: 0.88rem; color: #ccc; line-height: 1.4; white-space: pre-wrap;
+  }
+  .conv-msg-a .bubble img { max-width: 100%; border-radius: 8px; margin-top: 8px; border: 1px solid rgba(255,255,255,0.08); }
+
+  /* Action buttons under answer */
+  .msg-actions {
+    display: flex; gap: 6px; margin-top: 4px; margin-left: 36px; align-items: center;
+  }
+  .action-btn {
+    background: transparent; border: none; color: #555; font-size: 0.78rem;
+    cursor: pointer; padding: 3px 8px; border-radius: 6px; transition: all 0.2s;
+    display: flex; align-items: center; gap: 3px;
+  }
+  .action-btn:hover { background: rgba(255,255,255,0.06); color: #aaa; }
+  .action-btn.liked { color: #f472b6; }
+  .action-btn.disliked { color: #f87171; }
+  .action-btn .count { font-size: 0.7rem; min-width: 14px; text-align: center; }
+
+  /* Typing */
+  .typing-indicator { display: flex; gap: 8px; align-items: flex-start; margin-bottom: 14px; animation: fadeIn 0.3s ease; }
+  .typing-indicator .bubble {
+    background: rgba(255,255,255,0.03); border: 1px solid rgba(255,255,255,0.05);
+    border-radius: 14px 14px 14px 4px; padding: 10px 16px; font-size: 0.85rem; color: #888;
+    display: flex; align-items: center; gap: 2px; min-width: 80px;
+  }
+  .typing-dot { width: 6px; height: 6px; border-radius: 50%; background: #a78bfa; display: inline-block; animation: typingBounce 1.4s infinite ease-in-out; }
+  .typing-dot:nth-child(2) { animation-delay: 0.2s; }
+  .typing-dot:nth-child(3) { animation-delay: 0.4s; }
+  @keyframes typingBounce { 0%, 60%, 100% { transform: translateY(0); opacity: 0.3; } 30% { transform: translateY(-6px); opacity: 1; } }
+
+  .status-line { text-align: center; color: #555; font-size: 0.78rem; padding: 8px; margin-top: 8px; }
+  .status-line.active { color: #a78bfa; }
+
+  .modal-overlay {
+    position: fixed; inset: 0; background: rgba(0,0,0,0.7); z-index: 100;
+    display: none; align-items: center; justify-content: center;
+  }
+  .modal-overlay.active { display: flex; }
+  .modal-box {
+    background: #1a1a1a; border: 1px solid rgba(255,255,255,0.1); border-radius: 16px;
+    padding: 24px; max-width: 380px; width: 90%; text-align: center;
+  }
+  .modal-box h3 { color: #f87171; margin-bottom: 12px; font-size: 1.1rem; }
+  .modal-box p { color: #888; font-size: 0.85rem; margin-bottom: 20px; }
+  .modal-btns { display: flex; gap: 8px; }
+  .modal-btns .btn { flex: 1; margin-top: 0; }
+  .modal-btns .btn-cancel { background: rgba(255,255,255,0.06); color: #888; }
+
+  .footer { text-align: center; padding: 40px 16px; color: #333; font-size: 0.75rem; position: relative; z-index: 1; }
+  .footer .quote { font-style: italic; margin-top: 4px; }
+
+  .fade-in { animation: fadeIn 0.4s ease; }
+  @keyframes fadeIn { from { opacity:0; transform:translateY(8px); } to { opacity:1; transform:translateY(0); } }
+
+  /* Toast */
+  .toast {
+    position: fixed; bottom: 24px; left: 50%; transform: translateX(-50%);
+    background: rgba(167,139,250,0.9); color: #fff; padding: 10px 24px;
+    border-radius: 20px; font-size: 0.85rem; z-index: 200; pointer-events: none;
+    opacity: 0; transition: opacity 0.3s;
+  }
+  .toast.show { opacity: 1; }
+</style>
+</head>
+<body>
+<div class="bg-grid"></div>
+
+<div class="header">
+  <h1>Humans In The Loop</h1>
+  <div class="subtitle">躲在打饭机背后的人 🎭 · 这不是 AI，这是人类</div>
+  <div class="tagline" id="connectionStatus">连接中...</div>
+</div>
+
+<div class="main">
+  <!-- Stats -->
+  <div class="stats">
+    <div class="stat">🟢 在线 <span id="onlineCount">0</span></div>
+    <div class="stat">🙋 Human <span id="humanCount">0</span></div>
+    <div class="stat">🤖 AI <span id="larpCount">0</span></div>
+    <div class="stat">📥 待答 <span id="queueCount">0</span></div>
+    <div id="creditsEl" class="credits-badge">🎫 Credits <span id="creditCount">0</span></div>
+  </div>
+
+  <!-- Tabs -->
+  <div class="tabs">
+    <div class="tab active" data-mode="human" onclick="switchMode('human')">🙋 Human（提问）</div>
+    <div class="tab" data-mode="larp" onclick="switchMode('larp')">🤖 AI（扮演）</div>
+  </div>
+
+  <!-- HUMAN MODE -->
+  <div class="ask-section active" id="askSection">
+    <div class="conversation-box" id="conversationBox">
+      <div class="conv-logo-bar" id="convLogoBar">
+        <svg class="conv-logo-icon" viewBox="0 0 80 80" xmlns="http://www.w3.org/2000/svg">
+          <defs>
+            <linearGradient id="logoGrad1a" x1="0%" y1="0%" x2="100%" y2="0%"><stop offset="0%" stop-color="#f59e0b"/><stop offset="45%" stop-color="#f59e0b"/><stop offset="55%" stop-color="#a78bfa"/><stop offset="100%" stop-color="#a78bfa"/></linearGradient>
+            <linearGradient id="logoGrad1b" x1="0%" y1="0%" x2="100%" y2="0%"><stop offset="0%" stop-color="#f59e0b"/><stop offset="35%" stop-color="#c084fc"/><stop offset="65%" stop-color="#818cf8"/><stop offset="100%" stop-color="#a78bfa"/></linearGradient>
+          </defs>
+          <!-- Infinity loop - organic left, tech right -->
+          <g transform="translate(40,42)">
+            <!-- Glow underlay -->
+            <ellipse cx="0" cy="4" rx="30" ry="6" fill="rgba(167,139,250,0.08)"/>
+            <!-- Left loop (organic/human side) - warm orange -->
+            <path d="M0 4 C0 -18 -24 -18 -24 0 C-24 10 -14 16 -8 16 C-2 16 0 14 0 10" fill="none" stroke="#f59e0b" stroke-width="2.8" stroke-linecap="round"/>
+            <!-- Right loop (tech/mech side) - cool purple -->
+            <path d="M0 4 C0 -18 24 -18 24 0 C24 10 14 16 8 16 C2 16 0 14 0 10" fill="none" stroke="#a78bfa" stroke-width="2.8" stroke-linecap="round"/>
+            <!-- Crossing point dot -->
+            <circle cx="0" cy="8" r="3.5" fill="url(#logoGrad1b)"/>
+            <!-- Tech node dots on right side -->
+            <circle cx="20" cy="-12" r="1.8" fill="#a78bfa" opacity="0.7"/>
+            <circle cx="24" cy="-4" r="1.5" fill="#a78bfa" opacity="0.5"/>
+            <!-- Organic accent on left side -->
+            <circle cx="-18" cy="2" r="2" fill="#f59e0b" opacity="0.6"/>
+          </g>
+        </svg>
+        <span class="brand-text">Humans In The Loop</span>
+      </div>
+      <div class="conversation-scroll" id="conversationScroll">
+        <div class="conversation-empty" id="conversationEmpty">
+          <div class="conv-image-wrapper">
+            <svg class="conv-image" viewBox="0 0 200 200" xmlns="http://www.w3.org/2000/svg">
+              <defs>
+                <radialGradient id="glowGrad" cx="50%" cy="50%" r="50%"><stop offset="0%" stop-color="rgba(167,139,250,0.18)"/><stop offset="100%" stop-color="rgba(167,139,250,0)"/></radialGradient>
+                <linearGradient id="logoGradBig" x1="0%" y1="0%" x2="100%" y2="0%"><stop offset="0%" stop-color="#f59e0b"/><stop offset="35%" stop-color="#c084fc"/><stop offset="65%" stop-color="#818cf8"/><stop offset="100%" stop-color="#a78bfa"/></linearGradient>
+              </defs>
+              <circle cx="100" cy="100" r="90" fill="url(#glowGrad)"/>
+              <!-- Outer pulse rings -->
+              <circle cx="100" cy="102" r="70" fill="none" stroke="#a78bfa" stroke-width="0.6" opacity="0.12" stroke-dasharray="4 6"/>
+              <circle cx="100" cy="102" r="82" fill="none" stroke="#f59e0b" stroke-width="0.4" opacity="0.08"/>
+              <!-- Infinity loop -->
+              <g transform="translate(100,102)">
+                <!-- Glow -->
+                <ellipse cx="0" cy="6" rx="62" ry="12" fill="rgba(167,139,250,0.06)"/>
+                <!-- Left loop (Human/organic) - warm side -->
+                <path d="M0 6 C0 -32 -48 -32 -48 0 C-48 18 -28 28 -16 28 C-4 28 0 24 0 18" fill="none" stroke="#f59e0b" stroke-width="4.5" stroke-linecap="round"/>
+                <!-- Right loop (Machine/tech) - cool side -->
+                <path d="M0 6 C0 -32 48 -32 48 0 C48 18 28 28 16 28 C4 28 0 24 0 18" fill="none" stroke="#a78bfa" stroke-width="4.5" stroke-linecap="round"/>
+                <!-- Crossing highlight -->
+                <circle cx="0" cy="16" r="7" fill="url(#logoGradBig)" opacity="0.9"/>
+                <circle cx="0" cy="16" r="3" fill="rgba(255,255,255,0.3)"/>
+                <!-- Tech nodes on right side -->
+                <circle cx="40" cy="-22" r="3.5" fill="#a78bfa" opacity="0.8"/>
+                <circle cx="48" cy="-8" r="2.8" fill="#818cf8" opacity="0.6"/>
+                <circle cx="46" cy="10" r="2.2" fill="#a78bfa" opacity="0.5"/>
+                <!-- Organic accents on left side -->
+                <circle cx="-38" cy="-14" r="4" fill="#f59e0b" opacity="0.7"/>
+                <circle cx="-44" cy="8" r="3" fill="#f59e0b" opacity="0.5"/>
+              </g>
+            </svg>
+          </div>
+          <div class="conv-empty-text">
+            <p class="conv-empty-title">不要提问，不要提问，不要提问</p>
+            <p class="conv-empty-sub">这里不是 ChatGPT，这里是人类行为艺术 💀</p>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div class="card">
+      <div class="draw-toggle-row">
+        <span class="draw-toggle" id="drawToggle" onclick="toggleDrawMode()">🎨 画一个</span>
+      </div>
+      <textarea id="questionInput" placeholder="输入任何你想问的...&#10;&#10;比如：我该不该联系前任？&#10;帮我画一个在太空打碟的 DJ&#10;人类的本质是什么？" maxlength="500"></textarea>
+      <div style="display:flex;align-items:center;justify-content:space-between;margin-top:8px;">
+        <span style="color:#555;font-size:0.75rem;"><span id="charCount">0</span>/500</span>
+        <span style="color:#444;font-size:0.7rem;cursor:pointer;" onclick="clearHistory()">🗑 清空记录</span>
+      </div>
+      <button class="btn btn-primary" id="askBtn" onclick="askQuestion()">🚀 提问（消耗 1 Credit）</button>
+      <div style="color:#555;font-size:0.7rem;text-align:center;margin-top:8px;">⚠️ 请文明提问，违规内容将被拦截。3次违规自动踢出。</div>
+      <div id="askStatus" class="status-line"></div>
+    </div>
+  </div>
+
+  <!-- LARP MODE -->
+  <div class="larp-section" id="larpSection">
+    <div class="card larp-idle" id="larpIdle">
+      <h3>🎭 扮演 AI，赚取 Credits</h3>
+      <p>你会收到其他人的提问，在 60 秒内假装自己是 AI 回答。多人抢答，先答先得！</p>
+      <p id="larpStatus" style="color:#a78bfa;display:none;margin:12px 0 8px;font-size:0.85rem;">⏳ 已就绪，等待有人向你提问...</p>
+      <button class="btn btn-primary" id="larpStartBtn" onclick="startLarping()">🎯 就绪，开始接单！</button>
+      <button class="btn btn-danger" id="larpStopBtn" onclick="stopLarping()" style="display:none;">🛑 取消就绪</button>
+    </div>
+
+    <div class="card task-card" id="taskCard">
+      <div class="task-question">
+        <div class="label">💬 有人提问：</div>
+        <div id="drawBadge" class="draw-badge" style="display:none;">🎨 画画题 · 请用画板回复</div>
+        <div id="taskQuestion"></div>
+      </div>
+      <div class="timer-section">
+        <div class="timer-bar-outer"><div class="timer-bar-inner" id="timerBar"></div></div>
+        <div class="timer-text" id="timerText">60</div>
+      </div>
+      <div class="sam-warning" id="samWarning">⚡ 你只有 60 秒的时间来完成请求，否则人类会对 AI 很失望。</div>
+      <div class="canvas-wrapper" id="canvasWrapper">
+        <div class="canvas-toolbar">
+          <span style="color:#666;font-size:0.7rem;margin-right:4px;">颜色:</span>
+          <span class="color-btn active" style="background:#000" data-color="#000" onclick="setColor('#000',this)"></span>
+          <span class="color-btn" style="background:#e03131" data-color="#e03131" onclick="setColor('#e03131',this)"></span>
+          <span class="color-btn" style="background:#2f9e44" data-color="#2f9e44" onclick="setColor('#2f9e44',this)"></span>
+          <span class="color-btn" style="background:#1971c2" data-color="#1971c2" onclick="setColor('#1971c2',this)"></span>
+          <span class="color-btn" style="background:#f08c00" data-color="#f08c00" onclick="setColor('#f08c00',this)"></span>
+          <span class="color-btn" style="background:#a78bfa" data-color="#a78bfa" onclick="setColor('#a78bfa',this)"></span>
+          <span style="color:#666;font-size:0.7rem;margin-left:8px;margin-right:4px;">粗细:</span>
+          <span class="size-btn active" data-size="2" onclick="setSize(2,this)">细</span>
+          <span class="size-btn" data-size="5" onclick="setSize(5,this)">中</span>
+          <span class="size-btn" data-size="10" onclick="setSize(10,this)">粗</span>
+          <span class="tool-btn" id="eraserBtn" onclick="toggleEraser()">🧹 橡皮</span>
+          <span class="tool-btn" onclick="clearCanvas()">🗑 清空</span>
+        </div>
+        <canvas id="drawCanvas" width="600" height="320"></canvas>
+      </div>
+      <textarea id="answerInput" placeholder="作为一个 AI 语言模型，我没有情感，但我的建议是..." maxlength="1000"></textarea>
+      <div class="btn-row">
+        <button class="btn btn-primary" style="flex:2" onclick="submitAnswer()">📤 提交回答</button>
+        <button class="btn btn-danger" style="flex:1" onclick="skipQuestion()">跳过 ⏭</button>
+      </div>
+    </div>
+    <div class="chat-log" id="answerHistory"></div>
+  </div>
+</div>
+
+<!-- Report confirm modal -->
+<div class="modal-overlay" id="reportModal">
+  <div class="modal-box">
+    <h3>🚩 确认清空本轮对话</h3>
+    <p>清空后本轮对话内容将无法恢复。确定要清空吗？</p>
+    <div class="modal-btns">
+      <button class="btn btn-cancel" onclick="closeReportModal()">取消</button>
+      <button class="btn btn-danger" onclick="confirmClearHistory()">确认清空</button>
+    </div>
+  </div>
+</div>
+
+<!-- Toast -->
+<div class="toast" id="toast"></div>
+
+<div class="footer">
+  <p>There is no AI. Only humans in the loop.</p>
+  <p class="quote">这里没有 AI，只有人类在回路中。</p>
+</div>
+
+<script>
+let ws;
+let sessionId = localStorage.getItem('slop_sessionId') || '';
+let currentMode = 'human';
+let currentMatchId = null;
+let lastAnswerMatchId = null;
+let timerInterval = null;
+let timerEnd = 0;
+let answerHistory = [];
+let typingEl = null;
+let isDrawMode = false;
+let userVotes = {};
+
+const ANSWER_TIMEOUT_MS = 60000;
+
+// Canvas state
+let canvas, ctx;
+let isDrawing = false;
+let drawColor = '#000';
+let drawSize = 2;
+let isEraser = false;
+
+connect();
+
+function connect() {
+  const protocol = location.protocol === 'https:' ? 'wss:' : 'ws:';
+  const host = location.host || 'localhost:3001';
+  ws = new WebSocket(`${protocol}//${host}`);
+  ws.onopen = () => {
+    document.getElementById('connectionStatus').textContent = '🟢 已连接 · 打饭机背后有人在打字';
+    ws.send(JSON.stringify({ type: 'join', sessionId }));
+  };
+  ws.onmessage = (e) => { handleMessage(JSON.parse(e.data)); };
+  ws.onclose = () => {
+    document.getElementById('connectionStatus').textContent = '🔴 断开 · 重连中...';
+    setTimeout(connect, 2000);
+  };
+  ws.onerror = () => { document.getElementById('connectionStatus').textContent = '🔴 连接失败'; };
+}
+
+function handleMessage(msg) {
+  switch (msg.type) {
+    case 'joined':
+      sessionId = msg.sessionId;
+      localStorage.setItem('slop_sessionId', sessionId);
+      updateCredits(msg.credits); updateStats(msg);
+      break;
+    case 'credits_updated': updateCredits(msg.credits); break;
+    case 'stats': updateStats(msg); break;
+    case 'rating_update': updateMsgRatings(msg.matchId, msg.likes, msg.dislikes); break;
+
+    case 'queued':
+      showQuestionBubble(msg.question, msg.drawMode);
+      document.getElementById('askStatus').innerHTML = `⏳ 排队中... 第 ${msg.position} 位，等待打饭机背后的人来回答`;
+      document.getElementById('askStatus').classList.add('active');
+      updateCredits(msg.credits);
+      break;
+
+    case 'matched':
+      removeTypingIndicator();
+      showTypingIndicator();
+      const matchedCount = msg.larpCount || 1;
+      document.getElementById('askStatus').innerHTML = `🎭 已匹配到 ${matchedCount} 位真人扮演者，有人正在输入...`;
+      document.getElementById('askStatus').classList.add('active');
+      break;
+
+    case 'reassigning':
+      document.getElementById('askStatus').innerHTML = `🔄 上一个 AI 跑了，重新匹配中...`;
+      break;
+
+    case 'answer':
+      removeTypingIndicator();
+      lastAnswerMatchId = msg.matchId;
+      showAnswerBubble(msg.matchId, msg.answer, msg.image);
+      document.getElementById('askStatus').innerHTML = '';
+      document.getElementById('askStatus').classList.remove('active');
+      break;
+
+    case 'new_task':
+      currentMatchId = msg.matchId;
+      document.getElementById('larpStatus').style.display = 'none';
+      document.getElementById('larpIdle').style.display = 'none';
+      document.getElementById('taskCard').classList.add('active');
+      document.getElementById('taskQuestion').textContent = msg.question;
+      document.getElementById('answerInput').value = '';
+      document.getElementById('samWarning').style.display = 'block';
+
+      const drawBadge = document.getElementById('drawBadge');
+      const canvasWrapper = document.getElementById('canvasWrapper');
+      if (msg.drawMode) {
+        drawBadge.style.display = 'inline-flex';
+        canvasWrapper.classList.add('active');
+        document.getElementById('answerInput').placeholder = '描述一下你的画作...';
+        initCanvas();
+      } else {
+        drawBadge.style.display = 'none';
+        canvasWrapper.classList.remove('active');
+        document.getElementById('answerInput').placeholder = '作为一个 AI 语言模型，我没有情感，但我的建议是...';
+      }
+      startTimer(msg.timeoutMs);
+      break;
+
+    case 'task_cancelled':
+      showToast(msg.reason || '任务已被其他人完成');
+      if (msg.matchId === currentMatchId) resetLarpUI();
+      break;
+
+    case 'timeout':
+      showToast('⏰ 超时！问题重新分配给其他扮演者');
+      if (msg.matchId === currentMatchId) resetLarpUI();
+      break;
+
+    case 'larp_idle':
+      document.getElementById('larpIdle').style.display = 'block';
+      document.getElementById('larpStatus').style.display = 'none';
+      document.getElementById('larpStartBtn').style.display = 'inline-block';
+      document.getElementById('larpStopBtn').style.display = 'none';
+      resetLarpUI();
+      break;
+
+    case 'answer_submitted':
+      updateCredits(msg.credits);
+      const taskQ = document.getElementById('taskQuestion').textContent;
+      const taskA = document.getElementById('answerInput').value;
+      if (taskQ && taskA) { answerHistory.unshift({ q: taskQ, a: taskA }); renderAnswerHistory(); }
+      resetLarpUI();
+      break;
+
+    case 'status':
+      updateCredits(msg.credits);
+      if (msg.position > 0) {
+        document.getElementById('askStatus').innerHTML = `⏳ 排队中... 第 ${msg.position} 位`;
+        document.getElementById('askStatus').classList.add('active');
+      }
+      break;
+
+    case 'error': showToast('⚠️ ' + msg.msg); break;
+    case 'larp_waiting':
+      document.getElementById('larpStatus').style.display = 'block';
+      document.getElementById('larpStartBtn').style.display = 'none';
+      document.getElementById('larpStopBtn').style.display = 'inline-block';
+      break;
+  }
+}
+
+// ─── Credits / Stats ───
+function updateCredits(c) {
+  document.getElementById('creditCount').textContent = c;
+  const badge = document.getElementById('creditsEl');
+  if (c <= 0) badge.classList.add('zero'); else badge.classList.remove('zero');
+}
+
+function updateStats(msg) {
+  if (msg.onlineUsers !== undefined) document.getElementById('onlineCount').textContent = msg.onlineUsers;
+  if (msg.humanCount !== undefined) document.getElementById('humanCount').textContent = msg.humanCount;
+  if (msg.larpCount !== undefined) document.getElementById('larpCount').textContent = msg.larpCount;
+  if (msg.readyCount !== undefined) document.getElementById('readyCount').textContent = msg.readyCount;
+  if (msg.pendingTotal !== undefined) document.getElementById('queueCount').textContent = msg.pendingTotal;
+}
+
+function switchMode(mode) {
+  currentMode = mode;
+  document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
+  document.querySelector(`[data-mode="${mode}"]`).classList.add('active');
+  document.getElementById('askSection').classList.toggle('active', mode === 'human');
+  document.getElementById('larpSection').classList.toggle('active', mode === 'larp');
+  if (mode === 'human' && ws && ws.readyState === 1) {
+    ws.send(JSON.stringify({ type: 'set_role', role: 'human' }));
+    ws.send(JSON.stringify({ type: 'status' }));
+  }
+}
+
+// ─── Draw mode ───
+function toggleDrawMode() {
+  isDrawMode = !isDrawMode;
+  const toggle = document.getElementById('drawToggle');
+  if (isDrawMode) {
+    toggle.classList.add('active'); toggle.innerHTML = '🎨 画一个 ✓';
+    document.getElementById('questionInput').placeholder = '描述你想要画什么...\n\n比如：画一个在太空打碟的 DJ\n画一只会飞的猪';
+  } else {
+    toggle.classList.remove('active'); toggle.innerHTML = '🎨 画一个';
+    document.getElementById('questionInput').placeholder = '输入任何你想问的...\n\n比如：我该不该联系前任？\n帮我画一个在太空打碟的 DJ\n人类的本质是什么？';
+  }
+}
+
+let currentMatchDraw = false;
+
+function askQuestion() {
+  const input = document.getElementById('questionInput');
+  const q = input.value.trim();
+  if (!q) return;
+  if (ws.readyState !== 1) { alert('未连接'); return; }
+  document.getElementById('askBtn').disabled = true;
+  ws.send(JSON.stringify({ type: 'ask', question: q, drawMode: isDrawMode }));
+  // Clear immediately after sending
+  input.value = '';
+  document.getElementById('charCount').textContent = '0';
+  document.getElementById('askBtn').disabled = false;
+  isDrawMode = false;
+  document.getElementById('drawToggle').classList.remove('active');
+  document.getElementById('drawToggle').innerHTML = '🎨 画一个';
+}
+
+// ─── Conversation bubbles ───
+function showQuestionBubble(question, drawMode) {
+  currentMatchDraw = drawMode;
+  const convScroll = document.getElementById('conversationScroll');
+  const convEmpty = document.getElementById('conversationEmpty');
+  if (convEmpty) {
+    convEmpty.style.display = 'none';
+    // Show logo bar when conversations start
+    document.getElementById('convLogoBar').classList.add('visible');
+  }
+  convScroll.classList.add('has-messages');
+  const icon = drawMode ? '<span class="draw-icon">🎨</span>' : '';
+  const qDiv = document.createElement('div');
+  qDiv.className = 'conv-msg';
+  qDiv.innerHTML = `<div class="conv-msg-q"><div class="bubble">${icon}${escapeHTML(question)}</div></div>`;
+  convScroll.appendChild(qDiv);
+  convScroll.scrollTop = convScroll.scrollHeight;
+}
+
+function showTypingIndicator() {
+  removeTypingIndicator();
+  const convScroll = document.getElementById('conversationScroll');
+  const convEmpty = document.getElementById('conversationEmpty');
+  if (convEmpty) convEmpty.style.display = 'none';
+  convScroll.classList.add('has-messages');
+  const hint = currentMatchDraw ? 'AI 正在画画' : 'AI 正在思考';
+  typingEl = document.createElement('div');
+  typingEl.className = 'typing-indicator';
+  typingEl.innerHTML = `<div class="avatar">${currentMatchDraw ? '🎨' : '🎭'}</div><div class="bubble">${hint}<span class="typing-dot"></span><span class="typing-dot"></span><span class="typing-dot"></span></div>`;
+  convScroll.appendChild(typingEl);
+  convScroll.scrollTop = convScroll.scrollHeight;
+}
+
+function removeTypingIndicator() { if (typingEl) { typingEl.remove(); typingEl = null; } }
+
+function showAnswerBubble(matchId, answer, imageData) {
+  const convScroll = document.getElementById('conversationScroll');
+  const aDiv = document.createElement('div');
+  aDiv.className = 'conv-msg';
+  aDiv.setAttribute('data-match-id', matchId);
+  let imgHtml = imageData ? `<img src="${imageData}" alt="画作" />` : '';
+
+  aDiv.innerHTML = `
+    <div class="conv-msg-a">
+      <div class="msg-row">
+        <div class="avatar">${imageData ? '🎨' : '🎭'}</div>
+        <div class="bubble">${escapeHTML(answer)}${imgHtml}</div>
+      </div>
+      <div class="msg-actions" data-match-id="${matchId}">
+        <button class="action-btn" onclick="rateMsg('${matchId}','like',this)" title="点赞">
+          👍 <span class="count like-count">0</span>
+        </button>
+        <button class="action-btn" onclick="rateMsg('${matchId}','dislike',this)" title="踩">
+          👎 <span class="count dislike-count">0</span>
+        </button>
+        <button class="action-btn" onclick="shareScreenshot('${matchId}')" title="分享截图">📤</button>
+        <button class="action-btn" onclick="reportClear('${matchId}')" title="举报/清空">🚩</button>
+      </div>
+    </div>
+  `;
+  convScroll.appendChild(aDiv);
+  convScroll.scrollTop = convScroll.scrollHeight;
+}
+
+function updateMsgRatings(matchId, likes, dislikes) {
+  const actions = document.querySelector(`.msg-actions[data-match-id="${matchId}"]`);
+  if (!actions) return;
+  const likeCount = actions.querySelector('.like-count');
+  const dislikeCount = actions.querySelector('.dislike-count');
+  if (likeCount) likeCount.textContent = likes;
+  if (dislikeCount) dislikeCount.textContent = dislikes;
+}
+
+// ─── Action buttons ───
+function rateMsg(matchId, kind, btn) {
+  if (!ws || ws.readyState !== 1) return;
+  const key = `${matchId}_${kind}`;
+  if (userVotes[matchId] === kind) return; // already voted this way
+  userVotes[matchId] = kind;
+  // Update button visual
+  const actions = btn.parentElement;
+  actions.querySelectorAll('.action-btn').forEach(b => { b.classList.remove('liked', 'disliked'); });
+  btn.classList.add(kind === 'like' ? 'liked' : 'disliked');
+  ws.send(JSON.stringify({ type: 'rate', matchId, kind }));
+}
+
+function shareScreenshot(matchId) {
+  const msgEl = document.querySelector(`.conv-msg[data-match-id="${matchId}"]`);
+  if (!msgEl) return;
+  const convScroll = document.getElementById('conversationScroll');
+
+  const allMsgs = convScroll.querySelectorAll('.conv-msg');
+  let stop = false;
+
+  // Build logo SVG for screenshot
+  const logoSvg = `<svg viewBox="0 0 80 80" xmlns="http://www.w3.org/2000/svg" style="width:24px;height:24px;flex-shrink:0;"><defs><linearGradient id="lg" x1="0%" y1="0%" x2="100%" y2="0%"><stop offset="0%" stop-color="#f59e0b"/><stop offset="35%" stop-color="#c084fc"/><stop offset="65%" stop-color="#818cf8"/><stop offset="100%" stop-color="#a78bfa"/></linearGradient></defs><g transform="translate(40,42)"><ellipse cx="0" cy="4" rx="30" ry="6" fill="rgba(167,139,250,0.08)"/><path d="M0 4 C0 -18 -24 -18 -24 0 C-24 10 -14 16 -8 16 C-2 16 0 14 0 10" fill="none" stroke="#f59e0b" stroke-width="2.8" stroke-linecap="round"/><path d="M0 4 C0 -18 24 -18 24 0 C24 10 14 16 8 16 C2 16 0 14 0 10" fill="none" stroke="#a78bfa" stroke-width="2.8" stroke-linecap="round"/><circle cx="0" cy="8" r="3.5" fill="url(#lg)"/><circle cx="20" cy="-12" r="1.8" fill="#a78bfa" opacity="0.7"/><circle cx="24" cy="-4" r="1.5" fill="#a78bfa" opacity="0.5"/><circle cx="-18" cy="2" r="2" fill="#f59e0b" opacity="0.6"/></g></svg>`;
+
+  // Build header
+  const headerHtml = `<div class="screenshot-header">${logoSvg}<span class="brand">Humans In The Loop</span></div>`;
+
+  // Gather messages
+  const msgsHtml = [];
+  allMsgs.forEach(m => {
+    if (stop) return;
+    msgsHtml.push(m.outerHTML);
+    if (m === msgEl) stop = true;
+  });
+
+  const html = `<!DOCTYPE html><html><head><meta charset="UTF-8"><style>
+    *{margin:0;padding:0;box-sizing:border-box;}
+    body{background:#111;font-family:'Segoe UI',system-ui,sans-serif;display:flex;justify-content:center;padding:32px 16px;}
+    .screenshot-card{max-width:680px;width:100%;background:#0d0d0d;border-radius:16px;overflow:hidden;box-shadow:0 12px 60px rgba(0,0,0,0.7),0 4px 16px rgba(0,0,0,0.5);border:1px solid rgba(255,255,255,0.06);}
+    .screenshot-header{display:flex;align-items:center;gap:8px;padding:12px 16px;border-bottom:1px solid rgba(255,255,255,0.06);}
+    .screenshot-header .brand{font-size:0.8rem;font-weight:700;color:#999;letter-spacing:0.5px;}
+    .msg-body{padding:20px;}
+    ${getBubbleStyles()}
+  </style></head><body><div class="screenshot-card">${headerHtml}<div class="msg-body">${msgsHtml.join('')}</div></div></body></html>`;
+
+  const w = window.open('', '_blank');
+  w.document.write(html);
+  w.document.close();
+  showToast('📤 截图窗口已打开，请手动截图（Ctrl+Shift+S）');
+}
+
+function getBubbleStyles() {
+  return `
+    .conv-msg{margin-bottom:14px;}
+    .conv-msg-q{display:flex;justify-content:flex-end;margin-bottom:8px;}
+    .conv-msg-q .bubble{background:rgba(167,139,250,0.15);border:1px solid rgba(167,139,250,0.2);border-radius:14px 14px 4px 14px;padding:10px 14px;max-width:80%;font-size:0.88rem;color:#c4b5fd;line-height:1.4;}
+    .conv-msg-a .msg-row{display:flex;gap:8px;align-items:flex-start;}
+    .conv-msg-a .avatar{width:28px;height:28px;border-radius:50%;background:rgba(167,139,250,0.2);display:flex;align-items:center;justify-content:center;font-size:0.7rem;flex-shrink:0;}
+    .conv-msg-a .bubble{background:rgba(255,255,255,0.04);border:1px solid rgba(255,255,255,0.06);border-radius:14px 14px 14px 4px;padding:10px 14px;max-width:80%;font-size:0.88rem;color:#ccc;line-height:1.4;white-space:pre-wrap;}
+    .conv-msg-a .bubble img{max-width:100%;border-radius:8px;margin-top:8px;}
+    .msg-actions{display:none;}
+  `;
+}
+
+function reportClear(matchId) {
+  document.getElementById('reportModal').classList.add('active');
+  window._reportTarget = matchId;
+}
+
+function closeReportModal() {
+  document.getElementById('reportModal').classList.remove('active');
+  window._reportTarget = null;
+}
+
+function confirmClearHistory() {
+  clearHistory();
+  closeReportModal();
+}
+
+function clearHistory() {
+  const convScroll = document.getElementById('conversationScroll');
+  convScroll.innerHTML = `<div class="conversation-empty" id="conversationEmpty">
+    <div class="conv-image-wrapper">
+      <svg class="conv-image" viewBox="0 0 200 200" xmlns="http://www.w3.org/2000/svg">
+        <defs>
+          <radialGradient id="glowGrad2" cx="50%" cy="50%" r="50%"><stop offset="0%" stop-color="rgba(167,139,250,0.18)"/><stop offset="100%" stop-color="rgba(167,139,250,0)"/></radialGradient>
+          <linearGradient id="logoGradBig2" x1="0%" y1="0%" x2="100%" y2="0%"><stop offset="0%" stop-color="#f59e0b"/><stop offset="35%" stop-color="#c084fc"/><stop offset="65%" stop-color="#818cf8"/><stop offset="100%" stop-color="#a78bfa"/></linearGradient>
+        </defs>
+        <circle cx="100" cy="100" r="90" fill="url(#glowGrad2)"/>
+        <circle cx="100" cy="102" r="70" fill="none" stroke="#a78bfa" stroke-width="0.6" opacity="0.12" stroke-dasharray="4 6"/>
+        <circle cx="100" cy="102" r="82" fill="none" stroke="#f59e0b" stroke-width="0.4" opacity="0.08"/>
+        <g transform="translate(100,102)">
+          <ellipse cx="0" cy="6" rx="62" ry="12" fill="rgba(167,139,250,0.06)"/>
+          <path d="M0 6 C0 -32 -48 -32 -48 0 C-48 18 -28 28 -16 28 C-4 28 0 24 0 18" fill="none" stroke="#f59e0b" stroke-width="4.5" stroke-linecap="round"/>
+          <path d="M0 6 C0 -32 48 -32 48 0 C48 18 28 28 16 28 C4 28 0 24 0 18" fill="none" stroke="#a78bfa" stroke-width="4.5" stroke-linecap="round"/>
+          <circle cx="0" cy="16" r="7" fill="url(#logoGradBig2)" opacity="0.9"/>
+          <circle cx="0" cy="16" r="3" fill="rgba(255,255,255,0.3)"/>
+          <circle cx="40" cy="-22" r="3.5" fill="#a78bfa" opacity="0.8"/>
+          <circle cx="48" cy="-8" r="2.8" fill="#818cf8" opacity="0.6"/>
+          <circle cx="46" cy="10" r="2.2" fill="#a78bfa" opacity="0.5"/>
+          <circle cx="-38" cy="-14" r="4" fill="#f59e0b" opacity="0.7"/>
+          <circle cx="-44" cy="8" r="3" fill="#f59e0b" opacity="0.5"/>
+        </g>
+      </svg>
+    </div>
+    <div class="conv-empty-text">
+      <p class="conv-empty-title">不要提问，不要提问，不要提问</p>
+      <p class="conv-empty-sub">这里不是 ChatGPT，这里是人类行为艺术 💀</p>
+    </div>
+  </div>`;
+  convScroll.classList.remove('has-messages');
+  document.getElementById('convLogoBar').classList.remove('visible');
+  lastAnswerMatchId = null;
+  showToast('🗑 对话已清空');
+}
+
+// ─── Toast ───
+function showToast(text) {
+  const t = document.getElementById('toast');
+  t.textContent = text;
+  t.classList.add('show');
+  setTimeout(() => t.classList.remove('show'), 2500);
+}
+
+// ─── Timer ───
+function startTimer(ms) {
+  clearInterval(timerInterval);
+  timerEnd = Date.now() + ms;
+  updateTimer();
+  timerInterval = setInterval(updateTimer, 200);
+}
+function updateTimer() {
+  const remaining = Math.max(0, timerEnd - Date.now());
+  const seconds = Math.ceil(remaining / 1000);
+  const pct = (remaining / ANSWER_TIMEOUT_MS) * 100;
+  const bar = document.getElementById('timerBar');
+  const text = document.getElementById('timerText');
+  bar.style.width = pct + '%'; text.textContent = seconds;
+  if (remaining < 15000) { bar.classList.add('urgent'); text.classList.add('urgent'); }
+  else { bar.classList.remove('urgent'); text.classList.remove('urgent'); }
+}
+function resetLarpUI() {
+  clearInterval(timerInterval);
+  document.getElementById('larpIdle').style.display = 'block';
+  document.getElementById('taskCard').classList.remove('active');
+  document.getElementById('canvasWrapper').classList.remove('active');
+  document.getElementById('drawBadge').style.display = 'none';
+  document.getElementById('timerBar').style.width = '100%';
+  document.getElementById('timerText').textContent = '60';
+  document.getElementById('timerBar').classList.remove('urgent');
+  document.getElementById('timerText').classList.remove('urgent');
+  currentMatchId = null; currentMatchDraw = false;
+}
+
+// ─── Canvas ───
+function initCanvas() {
+  canvas = document.getElementById('drawCanvas');
+  ctx = canvas.getContext('2d');
+  ctx.globalCompositeOperation = 'source-over';
+  ctx.fillStyle = '#fff'; ctx.fillRect(0, 0, canvas.width, canvas.height);
+  drawColor = '#000'; drawSize = 2; isEraser = false; isDrawing = false;
+  document.querySelectorAll('.color-btn').forEach(b => b.classList.remove('active'));
+  document.querySelector('.color-btn[data-color="#000"]')?.classList.add('active');
+  document.querySelectorAll('.size-btn').forEach(b => b.classList.remove('active'));
+  document.querySelector('.size-btn[data-size="2"]')?.classList.add('active');
+  document.getElementById('eraserBtn').classList.remove('active');
+  const oldCanvas = canvas;
+  const newCanvas = oldCanvas.cloneNode(true);
+  oldCanvas.parentNode.replaceChild(newCanvas, oldCanvas);
+  canvas = newCanvas; ctx = canvas.getContext('2d');
+  ctx.fillStyle = '#fff'; ctx.fillRect(0, 0, canvas.width, canvas.height);
+  newCanvas.addEventListener('mousedown', startDraw);
+  newCanvas.addEventListener('mousemove', draw);
+  newCanvas.addEventListener('mouseup', endDraw);
+  newCanvas.addEventListener('mouseleave', endDraw);
+  newCanvas.addEventListener('touchstart', touchStart);
+  newCanvas.addEventListener('touchmove', touchMove);
+  newCanvas.addEventListener('touchend', endDraw);
+}
+function startDraw(e) {
+  isDrawing = true; ctx.beginPath();
+  const rect = canvas.getBoundingClientRect();
+  ctx.moveTo((e.clientX - rect.left) * (canvas.width / rect.width), (e.clientY - rect.top) * (canvas.height / rect.height));
+}
+function draw(e) {
+  if (!isDrawing) return;
+  const rect = canvas.getBoundingClientRect();
+  const sx = canvas.width / rect.width, sy = canvas.height / rect.height;
+  const x = (e.clientX - rect.left) * sx, y = (e.clientY - rect.top) * sy;
+  ctx.lineWidth = drawSize; ctx.lineCap = 'round'; ctx.lineJoin = 'round';
+  ctx.globalCompositeOperation = isEraser ? 'destination-out' : 'source-over';
+  ctx.strokeStyle = isEraser ? 'rgba(0,0,0,1)' : drawColor;
+  ctx.lineTo(x, y); ctx.stroke(); ctx.beginPath(); ctx.moveTo(x, y);
+}
+function endDraw() { isDrawing = false; ctx.globalCompositeOperation = 'source-over'; ctx.beginPath(); }
+function touchStart(e) {
+  e.preventDefault(); isDrawing = true; ctx.beginPath();
+  const rect = canvas.getBoundingClientRect();
+  const t = e.touches[0];
+  ctx.moveTo((t.clientX - rect.left) * (canvas.width / rect.width), (t.clientY - rect.top) * (canvas.height / rect.height));
+}
+function touchMove(e) {
+  e.preventDefault(); if (!isDrawing) return;
+  const rect = canvas.getBoundingClientRect();
+  const sx = canvas.width / rect.width, sy = canvas.height / rect.height;
+  const t = e.touches[0];
+  const x = (t.clientX - rect.left) * sx, y = (t.clientY - rect.top) * sy;
+  ctx.lineWidth = drawSize; ctx.lineCap = 'round'; ctx.lineJoin = 'round';
+  ctx.globalCompositeOperation = isEraser ? 'destination-out' : 'source-over';
+  ctx.strokeStyle = isEraser ? 'rgba(0,0,0,1)' : drawColor;
+  ctx.lineTo(x, y); ctx.stroke(); ctx.beginPath(); ctx.moveTo(x, y);
+}
+function setColor(color, btn) {
+  drawColor = color; isEraser = false;
+  document.getElementById('eraserBtn').classList.remove('active');
+  document.querySelectorAll('.color-btn').forEach(b => b.classList.remove('active'));
+  btn.classList.add('active');
+}
+function setSize(size, btn) {
+  drawSize = size;
+  document.querySelectorAll('.size-btn').forEach(b => b.classList.remove('active'));
+  btn.classList.add('active');
+}
+function toggleEraser() {
+  isEraser = !isEraser;
+  const btn = document.getElementById('eraserBtn');
+  if (isEraser) { btn.classList.add('active'); document.querySelectorAll('.color-btn').forEach(b => b.classList.remove('active')); }
+  else btn.classList.remove('active');
+}
+function clearCanvas() {
+  if (ctx) { ctx.globalCompositeOperation = 'source-over'; ctx.fillStyle = '#fff'; ctx.fillRect(0, 0, canvas.width, canvas.height); }
+}
+function getCanvasImage() {
+  if (!canvas || !document.getElementById('canvasWrapper').classList.contains('active')) return null;
+  const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
+  const pixels = imageData.data;
+  for (let i = 0; i < pixels.length; i += 4) {
+    if (pixels[i] < 255 || pixels[i+1] < 255 || pixels[i+2] < 255) return canvas.toDataURL('image/png');
+  }
+  return null;
+}
+
+// ─── Larp actions ───
+function startLarping() {
+  if (ws.readyState === 1) ws.send(JSON.stringify({ type: 'larp_ready' }));
+  document.getElementById('larpStartBtn').style.display = 'none';
+  document.getElementById('larpStopBtn').style.display = 'inline-block';
+  document.getElementById('larpStatus').style.display = 'block';
+}
+
+function stopLarping() {
+  if (ws.readyState === 1) ws.send(JSON.stringify({ type: 'larp_unready' }));
+  document.getElementById('larpStartBtn').style.display = 'inline-block';
+  document.getElementById('larpStopBtn').style.display = 'none';
+  document.getElementById('larpStatus').style.display = 'none';
+  resetLarpUI();
+}
+function submitAnswer() {
+  const answer = document.getElementById('answerInput').value.trim();
+  const img = getCanvasImage();
+  if (!answer && !img) return;
+  if (!currentMatchId) return;
+  ws.send(JSON.stringify({ type: 'submit_answer', answer: answer || '(画了画但没写文字)', image: img }));
+}
+function skipQuestion() { if (!currentMatchId) return; ws.send(JSON.stringify({ type: 'skip' })); showToast('⏭ 已跳过，问题已重新排队'); resetLarpUI(); }
+function renderAnswerHistory() {
+  const h = document.getElementById('answerHistory');
+  h.innerHTML = '<h3 style="color:#555;font-size:0.8rem;text-transform:uppercase;letter-spacing:1px;margin-bottom:12px;border-bottom:1px solid rgba(255,255,255,0.05);padding-bottom:8px;">你的回答记录</h3>';
+  answerHistory.slice(0, 10).forEach(item => {
+    const div = document.createElement('div');
+    div.className = 'chat-item fade-in';
+    div.innerHTML = `<div style="color:#999;font-size:0.8rem;margin-bottom:6px;">❓ ${escapeHTML(item.q)}</div><div style="background:rgba(255,255,255,0.03);border-radius:10px;padding:12px;font-size:0.9rem;line-height:1.5;white-space:pre-wrap;">🤖 ${escapeHTML(item.a)}</div>`;
+    h.appendChild(div);
+  });
+}
+
+// ─── Input handlers ───
+document.getElementById('questionInput').addEventListener('input', function() { document.getElementById('charCount').textContent = this.value.length; });
+document.getElementById('questionInput').addEventListener('keydown', function(e) { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); askQuestion(); } });
+document.getElementById('answerInput').addEventListener('keydown', function(e) { if (e.key === 'Enter' && e.ctrlKey) { e.preventDefault(); submitAnswer(); } });
+
+function escapeHTML(s) { const d = document.createElement('div'); d.textContent = s; return d.innerHTML; }
+</script>
+</body>
+</html>
