@@ -33,6 +33,30 @@ if (!fs.existsSync(CONFIG.dataDir)) {
 
 const sessionsFile = path.join(CONFIG.dataDir, 'sessions.json');
 const creditsFile  = path.join(CONFIG.dataDir, 'credits.json');
+const statsFile    = path.join(CONFIG.dataDir, 'stats.json');
+
+// Site analytics (persisted)
+let siteStats = { dates: {} }; // { "2026-06-24": { visits, questions, answers, sessCreated } }
+function loadStats() {
+  try {
+    if (fs.existsSync(statsFile)) siteStats = JSON.parse(fs.readFileSync(statsFile, 'utf-8'));
+    if (!siteStats.dates) siteStats.dates = {};
+  } catch (e) { console.error('[stats] load failed:', e.message); }
+}
+function saveStats() {
+  try {
+    fs.writeFileSync(statsFile + '.tmp', JSON.stringify(siteStats, null, 2));
+    fs.renameSync(statsFile + '.tmp', statsFile);
+  } catch (e) { console.error('[stats] save failed:', e.message); }
+}
+function track(metric) {
+  const today = new Date().toISOString().slice(0, 10);
+  if (!siteStats.dates[today]) {
+    siteStats.dates[today] = { visits: 0, questions: 0, answers: 0, sessCreated: 0 };
+  }
+  siteStats.dates[today][metric] = (siteStats.dates[today][metric] || 0) + 1;
+}
+loadStats();
 
 // Restore session credits (survive restart); everything else resets
 function loadCredits() {
@@ -232,6 +256,7 @@ setInterval(() => {
 // ─── Periodic persistence ──────────────────────────────────────────────
 setInterval(() => {
   saveCredits();
+  saveStats();
 }, CONFIG.persistInterval);
 
 // ─── Messaging helpers ─────────────────────────────────────────────────
@@ -393,6 +418,7 @@ const server = http.createServer((req, res) => {
           askRateMax: CONFIG.askRateMax,
           answerRateMax: CONFIG.answerRateMax
         },
+        analytics: siteStats,
         timestamp: new Date().toISOString()
       }, null, 2));
     }
@@ -451,6 +477,7 @@ const server = http.createServer((req, res) => {
       res.writeHead(404, { 'Content-Type': 'text/html; charset=utf-8' });
       return res.end('<!DOCTYPE html><html><head><meta charset="utf-8"><title>404</title></head><body style="background:#0d0d0d;color:#666;font-family:sans-serif;display:flex;align-items:center;justify-content:center;height:100vh;margin:0;"><div style="text-align:center"><h1 style="color:#a78bfa;font-size:3rem;margin:0">404</h1><p>页面不存在</p></div></body></html>');
     }
+    if (filePath === '/index.html') track('visits');
     res.writeHead(200, { 'Content-Type': mime });
     res.end(data);
   });
@@ -522,6 +549,7 @@ wss.on('connection', (ws, req) => {
         s.credits -= CONFIG.questionCost;
         send(ws, { type: 'credits_updated', credits: s.credits });
         waitingQueue.push({ sessionId, question: msg.question, timestamp: Date.now(), drawMode: msg.drawMode || false });
+        track('questions');
         send(ws, { type: 'queued', credits: s.credits, position: waitingQueue.length, question: msg.question, drawMode: msg.drawMode || false });
         dispatch();
         broadcastStats();
@@ -599,6 +627,7 @@ wss.on('connection', (ws, req) => {
 
         hitRate(answerTimestamps, sessionId);
         s.credits += CONFIG.answerReward;
+        track('answers');
         s.answersThisHour = (s.answersThisHour || 0) + 1;
 
         const qWs = wsBySession.get(match.questionerId);
